@@ -4,3 +4,6 @@ Motif.py, Replication.py files contains functions to find motifs and patterns in
 
 Network.h and Network.cpp files describe creation of weighted graph (gene expression) and find out trans associated gene based on CNV value. After getting all output data k-means clustering is done to get cancer sub types. Equations for finding trans associated genes are taken from a research paper.
 Here we create a network of 13038 proteins. Weight of edges is decided by gene expression values of 997 tumor pateints. Vertex weight is combination of its own copy number variation value and its neighour's weight.  
+
+R files used to do generate transpose of METABRIC data.
+Lab4 file contains code to process gene expression data (Rna Seq data). Data analysis includes extracting genomic feature, RPKM normalization, hierarchical clustering etc. Bioconductor package is used to do data analysis.
