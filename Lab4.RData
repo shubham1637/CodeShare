@@ -1,0 +1,191 @@
+cat("\014")
+rm(list = ls())
+cat("\014")
+rm(list = ls())
+setwd("F:/BioInformatics/BioInformatic Methods II")
+?read.delim
+targets <- read.delim("./Rrnaseq/data/targets.txt")
+length(targets)
+summary(targets)
+str(targets)
+rownames(targets)
+colnames(targets)
+head(targets)
+targets
+# We have two transciptome data file for flower and 2 files for sample taken from AP3 # domain
+# We have two transciptome data file for flower and 2 files for sample taken from AP3 domain
+library(QuasR)
+install.packages("QuasR")
+library(BiocInstaller)
+source("https://bioconductor.org/biocLite.R")
+biocLite()
+library(QuasR)
+biocLite("QuasR")
+browseVignettes("QuasR")
+library(QuasR)
+sampleFile <- "./Rrnaseq/data/QuasR_samples.txt"
+head(sampleFile)
+rownames(sampleFile)
+colnames(sampleFile)
+summary(sampleFile)
+str(sampleFile)
+ncol(sampleFile)
+nrow(sampleFile)
+sampleFile
+genomeFile <- "./Rrnaseq/data/tair10chr.fasta"
+# Just creating references in R
+dir.create("results")
+results <- "./results"
+dir.create("results")
+results <- "./Rrnaseq/results"
+dir.create("results")
+?dir.create
+dir.create(results)
+?qAlign
+summary(genomeFile)
+proj <- qAlign(sampleFile, genome=genomeFile, maxHits=1, splicedAlignment=FALSE, alignmentsDir=results, cacheDir=results)
+proj
+class(proj)
+alignmentStats(proj)
+?GenomicFeatures
+??GenomicFeatures
+library("GenomicFeatures")
+?makeTranscriptDbFromGFF
+??makeTranscriptDbFromGFF
+?loadDb
+txdb <- makeTranscriptDbFromGFF(file="./Rrnaseq/data/TAIR10_GFF3_trunc.gff",format= "gff3",dataSource="TAIR",species="Arabidopsis thaliana")
+libary(QuasR)
+library(GenomicFeatures)
+libary(QuasR)
+library(QuasR)
+?makeTranscriptDbFromGFF
+txdb <- makeTranscriptDbFromGFF(file="./Rrnaseq/data/TAIR10_GFF3_trunc.gff",format= "gff3",dataSource="TAIR",species="Arabidopsis thaliana")
+makeTranscriptDbFromGFF
+sessionInfo()
+txdb <- makeTxDbFromGFF(file="./Rrnaseq/data/TAIR10_GFF3_trunc.gff",format= "gff3",dataSource="TAIR",organism = "Arabidopsis thaliana")
+?qCount
+countDF3 <- qCount(proj, txdb, reportLevel="gene", orientation="any")
+class(countDF3)
+nrows(countDF3)
+length(countDF3)
+summary(countDF3)
+countDF3[1:7,]
+write.table(countDF3, "results/countDFgene.xls", col.names=NA, quote=FALSE, sep="\t")
+?write.table
+results
+results/countDFgene.xls
+stringmerge
+stringmerge()
+c("e","r")
+x<- c("e","r")
+x
+x<- paste("e","r")
+x
+x<- paste("e","r",sep= "")
+x
+write.table(countDF3, paste(results,"countDFgene.xls", sep = "/"), col.names=NA, quote=FALSE, sep="\t")
+write.table(countDF3, paste(results,"countDFgene.xlsx", sep = "/"), col.names=NA, quote=FALSE, sep="\t")
+?boxplot()
+?boxplot
+boxplot(countDF3[,2:5])
+boxplot(countDF3[,2:5],ylim=c(0,2000))
+boxplot(countDF3[,2:5],ylim=c(0,200))
+boxplot(countDF3[,2:5],ylim=c(0,500))
+boxplot(countDF3[,2:5], range = 0,)
+boxplot(countDF3[,2:5],ylim=c(0,500))
+median(countDF3[,2:5], na.rm = FALSE)
+median(countDF3[,2:5])
+median(countDF3[,2])
+median(countDF3[,3])
+median(countDF3[,4])
+median(countDF3[,5])
+?median
+quantile(countDF3[,2:5], na.rm = FALSE)
+colMedians( countDF3[,2:5], na.rm = FALSE )
+install.packages(miscTools)
+install.packages("miscTools")
+colMedians( countDF3[,2:5], na.rm = FALSE )
+library(miscTools)
+colMedians( countDF3[,2:5], na.rm = FALSE )
+boxplot(countDF3[,2:5],ylim=c(0,500))
+countDF3[,-1]
+countDF3[,-2]
+colSums(countDF3[1:2,-1])
+rpkmDFgene <- countDF3[,-1]/(countDF3[,1]/1000) / (colSums(countDF3[,-1])/1e6)
+rpkmDFgene
+(countDF3[,1]/1000)
+boxplot(rpkmDFgene)
+boxplot(rpkmDFgene,ylim=c(0,10000))
+boxplot(rpkmDFgene,ylim=c(0,1000))
+qQCReport(proj, pdfFilename=paste(results, "qc_report.pdf", sep = "/"))
+?qQCReport
+library(ape)
+install.packages("ape")
+library(ape)
+?cor
+d_spearman <- cor(rpkmDFgene, method="spearman")
+d_pearson <- cor(rpkmDFgene, method="pearson")
+d_pearson
+d_spearman
+hc <- hclust(dist(1-d_spearman))
+?hclust
+plot.phylo(as.phylo(hc), type="p", edge.col=4, edge.width=3, show.node.label=TRUE, no.margin=TRUE)
+hc <- hclust(dist(1-d_pearson))
+plot.phylo(as.phylo(hc), type="p", edge.col=4, edge.width=3, show.node.label=TRUE, no.margin=TRUE)
+# This was to perform reproducibility check
+d_kendall <- cor(rpkmDFgene, method="kendall")
+d_kendall
+hc <- hclust(dist(1-d_kendall))
+plot.phylo(as.phylo(hc), type="p", edge.col=4, edge.width=3, show.node.label=TRUE, no.margin=TRUE)
+biocLite(c("DESeq"))
+ibrary(DESeq)
+library(DESeq)
+biocLite(c("DESeq2"))
+library(DESeq2)
+targets$Factor
+conds <- targets$Factor
+conds
+?newCountDataSet
+cds <- newCountDataSet(countDF3[,2:5], conds)
+class(cds)
+counts(cds)[1:4, ]
+?estimateSizeFactors
+cds <- estimateSizeFactors(cds)
+cds
+cds <- estimateDispersions(cds)
+cds
+cds
+?nbinomTest
+res <- nbinomTest(cds, "AP3", "TRL")
+res
+res <- na.omit(res)
+res2fold <- res[res$log2FoldChange >= 1 | res$log2FoldChange <= -1,]
+res2foldpadj <- res2fold[res2fold$padj <= 0.05, ]
+res2foldpadj
+nrows(res2foldpadj)
+class(res2foldpadj)
+length(res2foldpadj)
+summary(res2foldpadj)
+nrow(res2foldpadj)
+res2foldpadj <- res2fold[res2fold$padj <= 0.01, ]
+nrow(res2foldpadj)
+hits = res2foldpadj$padj < 1e-5
+which(hits)
+es2foldpadj
+res2foldpadj
+TopHit <- res2fold[min(res2fold$padj), ]
+TopHit
+results.top = counts(cds[as.integer(row.names(res2foldpadj[hits,])),])
+results.top
+heatmap(results.top, Colv=NA, Rowv=NA, col=rev(heat.colors(256)))
+results_rpkm.top = rpkmDFgene[as.integer(row.names(res2foldpadj[hits,])),]
+heatmap(results_rpkm.top, Colv=NA, Rowv=NA, col=rev(heat.colors(256)))
+results.top[,0]
+savehistory("F:/BioInformatics/BioInformatic Methods II/Lab4.RData")
+ls()
+save(results.top, results_rpkm.top, file="Lab5Test.RData")
+heatmap(results_rpkm.top, Colv=NA, Rowv=NA, col=rev(heat.colors(256)))
+heatmap(results_rpkm.top, Colv=NA, col=rev(heat.colors(256)))
+#  clustring of samples
+heatmap(results_rpkm.top, Rowv=NA, col=rev(heat.colors(256)))
+savehistory("F:/BioInformatics/BioInformatic Methods II/Lab4.RData")
