@@ -186,3 +186,21 @@ for i in range(len(Qval)):
         j += 1
 print PsnSeqQ
 PsnSeqQ.index(min(PsnSeqQ))
+
+def naive_with_counts(Pattern, genome):
+    outIndices = []
+    Match = False
+    num_of_alignment = 0
+    num_of_charComp = 0
+    for i in range(len(genome)- len(Pattern) +1):
+        num_of_alignment += 1
+        for j in range(len(Pattern)):
+            if not Pattern[j] == genome[i+j]:
+                num_of_charComp += 1
+                Match = False
+                break
+            num_of_charComp += 1
+            Match = True
+        if Match == True:
+            outIndices.append(i)
+    return outIndices, num_of_alignment, num_of_charComp
