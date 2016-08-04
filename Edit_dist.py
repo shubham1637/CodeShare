@@ -90,8 +90,35 @@ def globalAlignment(Pattern, Text):
                 distComm = mat[i-1][j-1] + penalty[alphabet.index(Pattern[i-1])][alphabet.index(Text[j-1])]
             mat[i][j] = min (distHor,distVer,distComm)
     
-    return mat[-1][-1]
+    return min(mat[-1])
 
 a = 'TACCAGATTTCGA'
 b = 'TACCAGATTTCAA'
 globalAlignment(a, b)
+
+def edistMatRecursive(a,b):
+    mat = []
+    for i in range(len(a)+1):
+        mat.append([0]*(len(b)+1))
+    
+    for i in range(len(b)+1):
+        mat[0][i] = 0
+        
+    for i in range(len(a)+1):
+        mat[i][0] = i
+        
+    for i in range(1, len(a)+1):
+        for j in range(1, len(b)+1):
+            distHor = mat[i][j-1] + 1
+            distVer = mat[i-1][j] + 1
+            if a[i-1] == b[j-1]:
+                distComm = mat[i-1][j-1]
+            else:
+                distComm = mat[i-1][j-1] + 1
+            mat[i][j] = min (distHor,distVer,distComm)
+    
+    return min(mat[-1])
+
+Text = readGenome('chr1.GRCh38.excerpt.fasta')
+Pattern = 'GATTTACCAGATTGAG'
+edistMatRecursive(Pattern,Text)
