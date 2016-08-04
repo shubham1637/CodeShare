@@ -62,3 +62,36 @@ print dist
 
 #0.001 sec
 #2
+alphabet = ['A', 'C', 'G', 'T']
+penalty = [[0, 4, 2, 4, 8], \
+           [4, 0, 4, 2, 8], \
+           [2, 4, 0, 4, 8], \
+           [4, 2, 4, 0, 8], \
+           [8, 8, 8, 8, 8]]
+
+def globalAlignment(Pattern, Text):
+    mat = []
+    for i in range(len(Pattern)+1):
+        mat.append([0]*(len(Text)+1))
+    
+    # Removed the code that initializes first row with Position index
+    
+    # Filling the first column with the penalty values of skipping that character
+    for i in range(1, len(Pattern)+1):
+        mat[i][0] = mat[i-1][0] + penalty[alphabet.index(Pattern[i-1])][-1]
+        
+    for i in range(1, len(Pattern)+1):
+        for j in range(1, len(Text)+1):
+            distHor = mat[i][j-1] + penalty[-1][alphabet.index(Pattern[j-1])]
+            distVer = mat[i-1][j] + penalty[alphabet.index(Pattern[i-1])][-1]
+            if Pattern[i-1] == Text[j-1]:
+                distComm = mat[i-1][j-1]
+            else:
+                distComm = mat[i-1][j-1] + penalty[alphabet.index(Pattern[i-1])][alphabet.index(Text[j-1])]
+            mat[i][j] = min (distHor,distVer,distComm)
+    
+    return mat[-1][-1]
+
+a = 'TACCAGATTTCGA'
+b = 'TACCAGATTTCAA'
+globalAlignment(a, b)
