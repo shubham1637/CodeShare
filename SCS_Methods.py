@@ -27,10 +27,31 @@ def shortest_ss(SetOfString):
             scs = sup
     return scs
 
-
 import itertools
 SetOfString = ['ACGTCAGTC', 'ACGTAGCGTAC', 'CAGTGCATGC']
 shortest_ss(SetOfString)
+
+def shortest_ss_list(SetOfString):
+    scs = []
+    for ss in itertools.permutations(SetOfString):
+        sup = ss[0]
+        for i in range(1, len(ss)):
+            olen = overlap(sup,ss[i], 1)
+            sup += ss[i][olen:]
+        
+        if not scs:
+            scs.append(sup)
+           
+        for element in scs:
+            if len(sup) < len(element):
+                scs = []
+                scs.append(sup)
+            elif len(sup) == len(element) and sup != element:
+                scs.append(sup)
+    return scs
+SetOfString = ['CCT', 'CTT', 'TGC', 'TGG', 'GAT', 'ATT']
+shortest_ss_list(SetOfString)
+
 
 def Maximum_Overlap(SetOfString, minL):
     readA = ""
