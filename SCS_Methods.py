@@ -32,7 +32,7 @@ SetOfString = ['ACGTCAGTC', 'ACGTAGCGTAC', 'CAGTGCATGC']
 shortest_ss(SetOfString)
 
 def shortest_ss_list(SetOfString):
-    scs = []
+    scs = set()
     for ss in itertools.permutations(SetOfString):
         sup = ss[0]
         for i in range(1, len(ss)):
@@ -40,15 +40,17 @@ def shortest_ss_list(SetOfString):
             sup += ss[i][olen:]
         
         if not scs:
-            scs.append(sup)
+            scs.add(sup)
            
-        for element in scs:
+        for element in list(scs):
             if len(sup) < len(element):
-                scs = []
-                scs.append(sup)
-            elif len(sup) == len(element) and sup != element:
-                scs.append(sup)
-    return scs
+                scs.clear()
+                scs.add(sup)
+                break
+            elif len(sup) == len(element):
+                scs.add(sup)
+    return list(scs)
+
 SetOfString = ['CCT', 'CTT', 'TGC', 'TGG', 'GAT', 'ATT']
 shortest_ss_list(SetOfString)
 
