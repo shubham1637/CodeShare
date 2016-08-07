@@ -46,33 +46,47 @@ def readFastq(filename):
             Qval.append(q)
     return genome, Qval
 
-
 def createKmerSet(genomeReads, minL):
     dictOfKmer = {}
-    
     # Creating dictionary of all kmers and reads they are present in 
     for read in genomeReads:
-        for i in range(len(read) - minL +1):
-            kmer = read[i:i+ minL]
+        for i in range(len(read) - minL+1):
+            kmer = read[i: i+minL]
             if kmer not in dictOfKmer.keys():
                 dictOfKmer[kmer] = set([read])
-            dictOfKmer[kmer].add(read)
-    
+            else:
+                dictOfKmer[kmer].add(read)
+    return dictOfKmer
+
+def overlapPairs(dictOfKmer, minL):
     olaps = {}
     for keys in dictOfKmer:
         keyval = dictOfKmer[keys]
-        for (a,b) in permutations(keyval,2):
+        pairlist = list(permutations(keyval,2))
+        for (a,b) in pairlist:
             olen = overlap(a,b,minL)
             if olen > 0 and a!=b:
                 olaps[(a,b)] = olen
-    return olaps.keys()
+    return olaps
     
 import datetime as d
 t0 = d.datetime.now()
-genomeReads,_ = readFastq('ERR266411_1.first1000.fastq')
+genomeReads = []
+genomeReads,_ = readFastq('ERR266411_1.for_asm.fastq')
+print len(genomeReads)
 reads = ['CGTACG', 'TACGTA', 'GTACGT', 'ACGTAC', 'GTACGA', 'TACGAT']
-overlap_all_pairs = createKmerSet(genomeReads, 30)
-
+dictOfKmer = createKmerSet(genomeReads, 30)
 t1 = d.datetime.now()
 print (t1 - t0).total_seconds()
-print len(overlap_all_pairs)
+
+t0 = d.datetime.now()
+overlap_all_Pairs = overlapPairs(dictOfKmer, 30)
+t1 = d.datetime.now()
+print (t1 - t0).total_seconds()
+print len(list(overlap_all_Pairs.keys()))
+#904746
+l = list(overlap_all_Pairs.keys())
+st = set()
+for element in l:
+    st.add(element[0])
+len(st)    
