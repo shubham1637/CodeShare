@@ -17,6 +17,7 @@ def overlap(a, b, minL = 3): # Suffix of 'a' and prefix of 'b'
 overlap('TTACGT', 'ACGTGTAC')
 
 from itertools import permutations
+from collections import defaultdict
 list(permutations([1,2,3,4],3))
 
 def Basic_Overlap_match (reads, minL):
@@ -47,15 +48,12 @@ def readFastq(filename):
     return genome, Qval
 
 def createKmerSet(genomeReads, minL):
-    dictOfKmer = {}
+    dictOfKmer = defaultdict(set)
     # Creating dictionary of all kmers and reads they are present in 
     for read in genomeReads:
         for i in range(len(read) - minL+1):
             kmer = read[i: i+minL]
-            if kmer not in dictOfKmer.keys():
-                dictOfKmer[kmer] = set([read])
-            else:
-                dictOfKmer[kmer].add(read)
+            dictOfKmer[kmer].add(read)
     return dictOfKmer
 
 def overlapPairs(dictOfKmer, minL):
