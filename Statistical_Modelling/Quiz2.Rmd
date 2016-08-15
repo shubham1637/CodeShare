@@ -1,0 +1,161 @@
+---
+title: "Quiz2"
+author: "Shubham Gupta"
+date: "August 13, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+```{r Q1}
+library(gplots)
+library(devtools)
+library(Biobase)
+library(broom)
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/montpick_eset.RData")
+load(file=con)
+close(con)
+mp = montpick.eset
+pdata=pData(mp)
+edata=as.data.frame(exprs(mp))
+fdata = fData(mp)
+edata_tr = log2(edata + 1)
+svd1 = svd(edata)
+svd2 = svd(edata_tr)
+names(svd1)
+svd1$d[1]^2/sum(svd1$d^2)
+svd2$d[1]^2/sum(svd2$d^2)
+edata_centered = edata_tr - rowMeans(edata_tr)
+svd3 = svd(edata_centered)
+svd3$d[1]^2/sum(svd3$d^2)
+```
+
+### Question 2
+```{r, cache=TRUE}
+set.seed(333)
+kmeans1 = kmeans(edata_centered, centers = 2)
+names(kmeans1)
+Vec1 = svd3$v[,1]
+cor(Vec1, kmeans1$centers[1,])
+```
+
+### Question 3
+There are very few samples with more than 2 replicates so the estimates for those values will not be very good.
+```{r Q3, cache=TRUE}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bodymap_eset.RData")
+load(file=con)
+close(con)
+bm = bodymap.eset
+edata = exprs(bm)
+pdata_bm=pData(bm)
+names(pdata_bm)
+table(pdata_bm$num.tech.reps)
+Lm1 = lm(edata[1,] ~ as.factor(pdata_bm$num.tech.reps))
+names(Lm1)
+tidy(Lm1)
+par(pch = 19)
+plot(edata[1,], col = as.numeric((pdata_bm$num.tech.reps)))
+```
+
+
+### Question 4
+```{r Q4}
+Lm2 = lm(edata[1,] ~ pdata_bm$age + pdata_bm$gender)
+tidy(Lm2)
+```
+This coefficient means that for each additional year of age, the count goes down by an average of 23.91 for a fixed sex.
+
+
+### Question 5 and 9
+```{r Q5}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/montpick_eset.RData")
+load(file=con)
+close(con)
+mp = montpick.eset
+pdata=pData(mp)
+edata=as.data.frame(exprs(mp))
+fdata = fData(mp)
+edata_tr = log2(edata +1)
+library(limma)
+mod = model.matrix(~ as.factor(pdata$population))
+fit = lm.fit(mod, t(edata))
+names(fit)
+dim(fit$residuals)
+dim(fit$effects)
+dim(fit$coefficients)
+table(pdata$population, pdata$study) # Question 9
+```
+The effects are difficult to distinguish because the study variable and population variable are perfectly correlated.     
+
+
+### Question 6 NOT CORRECT
+The model coefficients for all samples for each gene, with the values for each gene stored in the columns of the matrix.     
+The definition of effects is given as : n (number of genes) vector of orthogonal single-df effects. The first rank of them correspond to non-aliased coefficients, and are named accordingly.
+```{r Q6, fig.align = "center"}
+rownames(fit$coefficients)
+rownames(fit$effects)[1:4]
+par(mfrow = c(1,2))
+plot(-fit$effects[1,], col = 2)
+plot(fit$coefficients[1,], col = 3)
+par(mfrow = c(1,1))
+```
+
+
+
+### Question 7
+```{r Q7}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bodymap_eset.RData")
+load(file=con)
+close(con)
+bm = bodymap.eset
+edata = exprs(bm)
+pdata_bm=pData(bm)
+y = pdata_bm$age[!is.na(pdata_bm$age)]
+mod = model.matrix(~ y)
+lm2 = lmFit(edata[, !is.na(pdata_bm$age)], mod)
+names(lm2)
+dim(lm2$coefficients)
+colnames(lm2$coefficients)
+lm2$coefficients[1000,2]
+plot(edata[1000,!is.na(pdata_bm$age)] ~ y, col =2)
+abline(lm2$coefficients[1000,], col = 3, lwd =2)
+```
+
+### Question 8
+```{r Q8}
+mod1 = model.matrix(~ y + as.factor(pdata_bm$tissue.type[!is.na(pdata_bm$age)]))
+mod1 = model.matrix(~ y + as.factor(pdata_bm$tissue.type[!is.na(pdata_bm$age)]))
+lm2 = lmFit(edata[, !is.na(pdata_bm$age)], mod1)
+dim(mod1)
+```
+
+
+### Question 10
+```{r Q10}
+set.seed(33353)
+edata_tr = log2(edata + 1)
+dim(edata_tr)
+edata_tr = edata_tr[rowMeans(edata_tr)>=1, ]
+dim(edata_tr)
+mod1 = model.matrix(~ y, data = pdata_bm[!is.na(pdata_bm$age),])
+mod0 = model.matrix(~ 1, data = pdata_bm[!is.na(pdata_bm$age),])
+library(sva)
+sva1 = sva(dat= edata_tr[,!is.na(pdata_bm$age)], mod = mod1, mod0 = mod0, n.sv = 1)
+cor(sva1$sv, y)
+summary(lm(sva1$sv ~ pdata_bm$gender[!is.na(pdata_bm$age)]))
+summary(lm(sva1$sv ~ pdata_bm$race[!is.na(pdata_bm$age)]))
+```
+
+
+
+### Session Info
+```{r sessionInfo, cache = TRUE}
+devtools::session_info()
+```
+
+### Last compilation
+
+Last compiled at `r Sys.Date()`.

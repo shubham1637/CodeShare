@@ -1,0 +1,433 @@
+---
+title: "Preprocessing, Linear Modelling and Batch effect"
+author: "Shubham Gupta"
+date: "August 7, 2016"
+output: html_document
+---
+
+
+
+Clean the global environment and set up plot settings
+```{r Clean_Environment}
+rm(list = ls())
+tropical=  c('darkorange', 'dodgerblue', 'hotpink', 'limegreen', 'yellow')
+palette(tropical)
+par(pch = 19)
+```
+
+
+```{r load_hidden, echo=FALSE, results="hide"}
+suppressPackageStartupMessages({
+  library(devtools)
+  library(Biobase)
+  library(preprocessCore) # For Quantile Normalization
+  library(broom) # To use tidy function
+  library(knitr)
+  library(limma)
+  library(snpStats)
+  library(bladderbatch)
+  library(sva)
+  library(dendextend) # To make prettier dendrograms
+})
+```
+
+### Load libraries
+```{r loadLibs}
+library(gplots)
+library(devtools)
+library(Biobase)
+library(preprocessCore)
+library(broom)
+library(knitr)
+library(limma)
+library(snpStats)
+library(bladderbatch)
+library(sva)
+```
+
+
+## Data Preprocessing
+
+Load dataset: This is combination of two different datasets. Two different population measurements from two different labs.    
+
+```{r LoadingData, cache = TRUE}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/montpick_eset.RData")
+load(file=con)
+close(con)
+mp = montpick.eset
+pdata=pData(mp)
+edata=as.data.frame(exprs(mp))
+fdata = fData(mp)
+```
+
+### Perform singular value decomposition
+It is very important what mean value you subtract. The PCA algorithm in R subtract column mean. And that makes sense if you want to observe variation across samples.
+```{r SVD, cache = TRUE}
+edata = edata[rowMeans(edata)>100,]
+edata = log2(edata+1)
+dim(edata)
+edata_centered = edata - rowMeans(edata)
+svd1 = svd(edata_centered)
+class(svd1)
+summary(svd1)
+names(svd1)
+class(svd1$d)
+```
+
+### Interpreting and understanding output of SVD
+V = 129 x 129 so it is telling SOMETHING about variation in samples and b/w samples(analogous to covariance) across gene expression. It is most likely the principal component of Variation among samples across all genes.
+Similarly U tells variation of gene expressions across all samples.
+M = USV'      
+PCA used SVD to rank the importance of features, then U matrix will have all features (columns) ranked, we choose the first k columns which represent the most important one. Remember S is diagonal matrix, therefore features are present in columns of U, not in rows of U. Rows of U don' give any relevant information.
+
+Similarly, columns of V are important not rows as it is after diagonal matrix S.      
+
+```{r SVDinterpret}
+length(svd1$d)
+dim(edata)
+dim(svd1$v)
+dim(svd1$u)
+```
+
+So this Singular value decomposition happend across samples.
+
+### Analyzing SVD output matrices
+```{r SVD_Analysis, cache = TRUE}
+plot(svd1$d, ylab = "Singular values", col = 4)
+plot(svd1$d^2/sum(svd1$d^2), ylab = "Percentage of variance explained", col = 3)
+# So first singular value explains more than 50% of variance so it is highly explanatory variable.
+# So we need to analyze how does it look like
+par(mfrow = c(1,2))
+plot(svd1$v[,1], ylab = "1st Eigen gene", col = as.numeric(pdata$study))
+legend(40, 0.3, legend= levels(pdata$study), col = seq_along(levels(pdata$study)), lty = 1 , lwd = 3)
+plot(svd1$v[,2], ylab = "2nd Eigen gene", col = as.numeric(pdata$study))
+legend(25, 0.34, legend= levels(pdata$study), col = seq_along(levels(pdata$study)), lty = 1 , lwd = 3)
+par(mfrow = c(1,1))
+plot(svd1$v[,1], svd1$v[,2], xlab = "1st Eigen gene", ylab = "2nd Eigen gene", col = as.numeric(pdata$study))
+```
+
+So it can be seen from last plot that first eigen gene draws very different values from both data sets. So it can make big difference which dataset is used to do analysis as selecting dataset can create big difference let alone within sample.
+
+
+```{r box_plots, cache = TRUE}
+
+boxplot(svd1$v[,1] ~ pdata$study, border = c(1,2))
+# ~ signifies a formula used to split the plot into groups
+# border is used to give vector for colors
+points(svd1$v[,1] ~ jitter(as.numeric(pdata$study)), col = as.numeric(pdata$study)) # points is used to overlay datapoints on top of boxplot
+```
+
+Now we compare resuls with principal component analysis (PCA).
+```{r PCA, cache = TRUE}
+pc1 = prcomp(edata, center = TRUE) # It automatically center data along columns. It subtracts column mean. It also uses SVD as that is generally the preferred method for numerical accuracy.This function find principal component of all columns
+plot(pc1$rotation[,1], svd1$v[,1]) # This doesn't match because we subtracted rowMeans instead of colMeans. That subtraction gave us something else.
+edata_centered2 = t(t(edata) - colMeans(edata))
+svd2 = svd(edata_centered2)
+plot(pc1$rotation[,1], svd2$v[,1], col = 4)
+```
+
+Hence, this is true PC of variation between samples across gene expression.
+
+Outliers can affect SVD output severly.
+```{r OutlierEffect, fig.align="center", cache = TRUE}
+edata_outlier = edata_centered
+edata_outlier[6,] = edata_outlier[6,]*10000
+svd3 = svd(edata_outlier)
+plot(svd1$v[,1], svd3$v[,1], xlab = "Without Outlier", ylab = "With outlier", col = 1) # Don't match anymore
+
+plot(svd3$v[,1], edata_outlier[6,], col = 3) # Very high correlation
+```
+
+
+### Quantile Normalization
+The point of doing quantile normalization is that you can compare different samples on the same scale without worrying about the absolute numbers. However, filtering out outliers help so your data don't skew to one particular direction.
+```{r QuantileNorm, cache = TRUE}
+edata=as.data.frame(exprs(mp))
+edata = log2(edata +1)
+dim(edata)
+edata = edata[rowMeans(edata)>3,]
+dim(edata)
+coloramp = colorRampPalette(c(4,"white",3))(20) #Breaking set into 20 colors
+plot(density(edata[,1]), col =coloramp[1], lwd = 3, ylim = c(0, 0.2))
+for (i in 2:20){lines(density(edata[,i]), col =coloramp[i], lwd = 3)}
+colMax <- function(edata) sapply(edata, max, na.rm = FALSE)
+colMax(edata[,1:20])
+edata_norm = normalize.quantiles(as.matrix(edata))
+par(mfrow = c(1,2))
+qqplot(edata[,1], edata[,2])
+qqplot(edata_norm[,1], edata_norm[,2]) # In general, low-expressing data tends to be more noisy than the high-expression one. It could also be intrinsic to biological phenomena.
+par(mfrow = c(1,1))
+dim(edata_norm)
+plot(density(edata_norm[,1]), col =coloramp[1], lwd = 3, ylim = c(0, 0.2))
+for (i in 2:20){lines(density(edata_norm[,i]), col =coloramp[i], lwd = 3)}
+x = as.matrix(edata)
+plot(x[1,], ylab = "Gene expression", col = as.numeric(pdata$study))
+plot(edata_norm[1,], ylab = "Gene expression", col = as.numeric(pdata$study)) # It hasn't removed gene by gene variation, so it is good.
+```
+
+Now, one can do SVD to solidify that gene to gen variability is still present. so, by quantile normalization we have removed some technical artefacts but data still has batch effect or other kind of artefacts.
+
+## Linear Modelling
+Models for **lm** are specified symbolically. A typical **model formula** has the form *response* ~ *terms* where *response* is the (numeric) response vector (y-axis) and terms/ explanatory variable (x-axis) is a series of terms which specifies a linear predictor for *response*. If *response* is a matrix a linear model is fitted separately by least-squares to each column of the matrix.      
+
+```{r Linear model, fig.align= "center", cache = TRUE}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bodymap_eset.RData")
+load(file=con)
+close(con)
+bm = bodymap.eset
+pdata=pData(bm)
+edata=as.data.frame(exprs(bm))
+dim(edata)
+edata = as.matrix(edata)
+plot(edata[1,] ~ pdata$age, col = 3, ylim = c(-1, 2400))
+Lm1 = lm(edata[1,] ~ pdata$age) #Age is a quantitative covariate here.
+Lm1
+tidy(Lm1)
+abline(Lm1, col = 2, lwd =2) #lm function removed NA values already
+edata[1,]
+pdata$age
+x = edata[1, -c(11,12,13)]
+y = pdata$age[!is.na(pdata$age)]
+mean1 = mean(x)
+Lm2 = lm(x ~ y)
+Lm2
+abline(h = mean1)
+plot(Lm1) # These plots tells us about residuals. First two plots are very important.
+summary(Lm1) #Important
+pdata$gender
+table(pdata$gender)
+boxplot(edata[1,] ~ pdata$gender)
+points(edata[1,] ~ jitter(as.numeric(pdata$gender)), col = as.numeric(pdata$gender))
+
+# dummy variables are variables equal to 1 if something is TRUE
+dummy_m = pdata$gender =="M" # For female it could be done similarly
+dummy_m
+dummy_m*1
+Lm2 = lm(edata[1,] ~ pdata$gender)
+Lm2
+tidy(Lm2)
+model.matrix(Lm2) # This is what lm function does. It converts factor variable to the dummy variable
+table(pdata$tissue.type) # Likewise you can define dummy variables for all tissue type
+dummy_1 = pdata$tissue.type == "adipose"
+dummy_1
+dummy_2 = pdata$tissue.type == "mixture"
+dummy_2
+tidy(lm(edata[1,] ~ pdata$tissue.type)) # On looking closely, the baseline is the value for adipose and all other tissue type tell diffrence with that value. adrenal = 1354 + (-1138)
+```
+
+### Adjusting for variables:
+```{r VarAdjust, cache = TRUE}
+Lm3 = lm(edata[1,] ~ pdata$age + pdata$gender)
+tidy(Lm3) # This fits the same relationship for males and females
+Lm4 = lm(edata[1,] ~ pdata$age*pdata$gender) # This is interaction term
+tidy(Lm4) #Now you have two lines(one for male and one for female)
+```
+
+
+### Effect of Outlier
+```{r Outlier, cache = TRUE}
+Lm5 = lm(edata[6,] ~ pdata$age)
+plot(edata[6,] ~ pdata$age, col = 2)
+abline(Lm5, col = 3, lwd =2) # Here we can't see the effect of outlier whether it is pulled northward
+index = 1:19
+plot(index, edata[6, ], col = 4) # Now we know the index
+Lm6 = lm(edata[6,-19] ~ index[-19])
+abline(Lm6, col = 3, lwd =2)
+Lm7 = lm(edata[6,] ~ index)
+abline(Lm7, col = 2, lwd =2) #This shows that outier is indeed pulling up the line, Hence your model depends on covariate.
+legend(5,1500, legend = c("With Outlier", "Without outlier"), col = c(2,3), lwd = 3)
+```
+
+
+### Investigating residuals
+```{r residuals, fig.align = "center", cache = TRUE}
+par(mfrow = c(1,2))
+hist(Lm6$residuals, col = 2)
+hist(Lm7$residuals, col = 3) # Outlier contributes a very large residual
+gene1 = log2(edata[1,])+1
+Lm8 = lm(gene1 ~ index)
+par(mfrow = c(1,1))
+hist(Lm8$residuals, col = "green")
+Lm9 = lm(gene1 ~ pdata$tissue.type +pdata$age)
+tidy(Lm9)
+# Many coefficients are not defined because there are too many covariates here. You are fitting too many parameters (18) in few data points (16)
+# Remember there were 17 tissue types, since they are not quantitative it creates 17 columns for them and 18th is for age. Hence dimension of model matrix is 16 X 18
+dim(model.matrix(~ pdata$tissue.type +pdata$age))
+dim(model.matrix(Lm9)) #This is one less as we know one dummy variable goes into baseline.
+```
+
+So, one needs to be careful that they don't have covariates with too many levels.
+Detailed information about model matrix can be found at http://www.stat.wisc.edu/~st849-1/Rnotes/ModelMatrices.html#sec-1
+
+```{r, cache = TRUE}
+coloramp = colorRampPalette(1:4)(17) # Because we have 17 tissue types we want to plot against
+Lm9 = lm(gene1 ~ pdata$age)
+plot( Lm9$residuals, col = coloramp[as.numeric(pdata$tissue.type)])
+par(pch = 11)
+plot(Lm9$residuals, col = coloramp[as.numeric(pdata$tissue.type)]) # By this you can get which residual is associated with what tissue type (covariate)
+```
+
+
+## Regression Modelling
+
+First load data for regression analysis
+```{r Regression_data, cache = TRUE}
+par(pch = 21)
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bottomly_eset.RData")
+load(file=con)
+close(con)
+bot = bottomly.eset
+pdata=pData(bot)
+edata = as.matrix(exprs(bot))
+fdata = fData(bot)
+```
+
+Regression model:
+```{r}
+edata = log2(edata + 1)
+edata = edata[rowMeans(edata)> 10, ]
+dim(edata)
+# So now we have to fit 1000 times. We need to create a common model matrix because we want to fit exact same model for every single gene.
+
+mod = model.matrix(~ pdata$strain)
+names(mod)
+fit = lm.fit(mod, t(edata))
+names(fit)
+class(fit)
+class(fit$coefficients)
+dim(fit$coefficients)
+fit$coefficients[,1]
+tidy(lm(edata[1,] ~ pdata$strain)) # Same values from both methods.
+# lm.fit is much much faster as you can fit multiple models at the same time
+par(mfrow= c(1,2))
+hist(fit$coefficients[2,], breaks = 100, col = 2, xlab = "Distribution of strain coeff")
+# This way you can visualize distribution of intercepts and slopes to see how lines wouldd like.
+hist(fit$coefficients[1,], breaks = 100, col = 3, xlab = "Distribution of intercepts")
+
+#Similarly residuals can be visualized.
+plot(fit$residuals[,1], col = 2)
+plot(fit$residuals[,2], col = 4)
+```
+
+Now we can analyze regression model for adjusted model fit.
+```{r AdjustFit}
+Lane_covariate = as.factor(pdata$lane.number) #Covariate has to be unique
+mod_adj = model.matrix(~ pdata$strain + Lane_covariate)
+fit_adj = lm.fit(mod_adj, t(edata))
+names(fit_adj)
+dim(fit_adj$coefficients)
+fit_adj$coefficients[,1] # Now we have intercepts and other adjustment variables as well
+dim(mod)
+dim(mod_adj)
+```
+
+Now we will use functions given in Limma package for model fit
+```{r Limma}
+lim_fit = lmFit(edata, mod_adj)
+names(lim_fit)
+names(fit_adj)# So there is some more information with Limma'a lmFit function
+dim(lim_fit$coefficients)
+lim_fit$coefficients[1,] #So output is same just there placement is different
+```
+
+Now we will use functions given in edge package for model fit
+```{r}
+
+```
+
+
+## Batch effect and Confounders
+The biggest confounder in genomics is Batch effect. Most common reason for false positive in genomics is batch effect.
+```{r Batch_Effect, cache= TRUE}
+data(bladderdata)
+pdata = pData(bladderEset)
+edata = exprs(bladderEset)
+class(edata)
+class(pdata)
+dim(edata)
+head(pdata)
+dim(pdata)
+mod = model.matrix(~ as.factor(pdata$cancer) + as.factor(pdata$batch), data = pdata)
+dim(mod)
+Lm = lm.fit(mod, t(edata))
+names(Lm)
+dim(Lm$coefficients)
+rownames(Lm$coefficients)
+hist(Lm$coefficients[2,], col = "green", breaks = 100 ,xlab = "Cancer coefficient")
+table(pdata$cancer, pdata$batch) 
+```
+
+This is a bad study design because each batch contains only one cancer type. Ideally, Each batch should contain every cancer type. But there are still some data over which we can do our adjustment. But if there is perfect correlation between batch and cancer variable we can not do any adjustment. Perfect correlation means Batch 1 has only cancer, batch 2 has only normal cells.
+
+
+ComBat allows users to adjust for batch effects in datasets where the batch covariate is known. 
+```{r, cache=TRUE}
+modCombat = model.matrix(~1, data = pdata)
+modCancer = model.matrix(~ as.factor(pdata$cancer), data = pdata)
+dim(modCancer)
+dim(modCombat)
+edata_combat = ComBat(dat = edata, batch = pdata$batch, mod = modCombat, par.prior = T, prior.plots= TRUE) #It is going to regress out the batch effect from the data
+Lm1 = lm.fit(modCancer, t(edata_combat))
+par(mfrow = c(1,1))
+hist(Lm1$coefficients[2,], col = "green", breaks = 100 ,xlab = "Cancer coefficient")
+plot(Lm$coefficients[2,], Lm1$coefficients[2,], xlab = "Linear Model", ylab = "Combat", col = 3, xlim = c(-5,5), ylim = c(-3,3))
+abline(c(0,1), lwd = 3)
+```
+
+So combat values are less than linear model because we have done some shrinkage.      
+If batch variable is not available then we may want to infer it. Here we update model instead of expression data
+```{r Batch_SVA, fig.align= "center", cache=TRUE}
+sva1 = sva(dat= edata, mod = modCancer, mod0 = modCombat, n.sv = 2)
+class(sva1)
+names(sva1)
+summary(lm(sva1$sv ~ pdata$batch)) # 2nd surrogate variable is highly correlated to batch variable. So we can use linear model to find correlation as well.
+boxplot(sva1$sv[,2] ~ as.factor(pdata$batch))
+par(pch = 19)
+points(sva1$sv[,2] ~ jitter(as.numeric(pdata$batch)), col = as.numeric(pdata$batch))
+#With SVA we don't clean data set. We just have identified new covariate which we will include in our model.
+cb_mod = cbind(modCancer, sva1$sv) #Combine by columns
+dim(cb_mod)
+fitsv = lm.fit(cb_mod, t(edata))
+par(mfrow= c(1,2))
+plot(fitsv$coefficients[2,], Lm1$coefficients[2,], xlab = "SVA", ylab = "Combat", col = 3, xlim = c(-5,5), ylim = c(-5,5))
+abline(c(0,1), lwd = 3) # Combat is shrunk so seems less correlated
+plot(fitsv$coefficients[2,], Lm$coefficients[2,], xlab = "SVA", ylab = "Linear model", col = 2, xlim = c(-5,5), ylim = c(-5,5))
+abline(c(0,1), lwd = 3)
+par(mfrow= c(1,1))
+```
+
+Batch effect could be technological artifacts or could be biological condounders.
+```{r as, cache=TRUE}
+data(for.exercise) #Loads three data sets: snps.10, snp.support and subject.support
+class(subject.support)
+names(subject.support)#cc gives case/control status (1=case), and stratum gives ethnicity
+dim(subject.support)
+table(subject.support$cc)
+controls <- rownames(subject.support)[subject.support$cc == 0]# Taking data which has no disease association
+ontrols <- rownames(subject.support[subject.support$cc == 0, ]) #Both are same
+length(controls)
+dim(snps.10)
+use <- seq(1,ncol(snps.10),10) # Taking every tenth SNPs
+da = snps.10[controls, use]
+# Calculating principal component analysis
+xxmat = xxt(da, correct.for.missing = FALSE)
+evv = eigen(xxmat, symmetric = TRUE) #Eigen decomposition
+pcs = evv$vectors[,1:5] # PCs are eigen vectors 
+dim(pcs)
+# Now we want what population these PCs come from
+pop = subject.support[controls, "stratum"]
+plot(pcs[,1], col = as.numeric(pop), xlab = "index", ylab = "PC1")
+legend(100,0.02, legend = levels(pop), col = 1:2, lwd = 3)
+plot(pcs[,1], pcs[,2], col = as.numeric(pop), xlab = "PC1", ylab = "PC2")
+legend(0,0.15, legend = levels(pop), col = 1:2, lwd = 3)
+```
+
+We can say that major effect on genetics is due to the population. So, if disease is also associated with population, it could be a confounder.  So the typical way that people deal with this is by using just direct principle component analysis, and PC for the adjustment. The reason being that the signal is often weak enough in genetic association studies that it's not likely to be captured by the PC. And so you can just remove the PCs.
+
+### Session Info
+```{r sessionInfo}
+devtools::session_info()
+```
+
+### Last compilation
+Last compiled at `r Sys.Date()`.

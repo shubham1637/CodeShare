@@ -1,0 +1,117 @@
+---
+title: "Quiz1"
+author: "Shubham Gupta"
+date: "July 31, 2016"
+output: html_document
+---
+You don't have to seed, caching give the same results as long as cache files aren't touched
+```{r setup, eval=TRUE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+```{r }
+x = rnorm(10)
+plot(x,pch=19,col="dodgerblue")
+```
+
+```{r }
+y = rbinom(20,size=1,prob=0.5)
+table(y)
+```
+
+
+## What Is Metastatic Cancer?
+
+The main reason that cancer is so serious is its ability to spread in the body. Cancer cells can spread locally by moving into nearby normal tissue. Cancer can also spread regionally, to nearby lymph nodes, tissues, or organs. And it can spread to distant parts of the body. When this happens, it is called metastatic cancer. For many types of cancer, it is also called stage IV (four) cancer. The process by which cancer cells spread to other parts of the body is called metastasis.
+
+When observed under a microscope and tested in other ways, metastatic cancer cells have features like that of the primary cancer and not like the cells in the place where the cancer is found. This is how doctors can tell that it is cancer that has spread from another part of the body.
+
+Metastatic cancer has the same name as the primary cancer. For example, breast cancer that spreads to the lung is called metastatic breast cancer, not lung cancer. It is treated as stage IV breast cancer, not as lung cancer.
+
+
+Suppose that you have measured ChIP-Seq data from 10 healthy individuals and 10 metastatic cancer patients. For each individual you split the sample into two identical sub-samples and perform the ChIP-Seq experiment on each sub-sample. How can you measure (a) biological variability, (b) technical variability and (c) phenotype variability.
+
+
+(a) By looking at variation across samples from 10 different individuals with cancer or healthy
+
+(b) By looking at variability between the measurements on the two sub-samples from the same sample and
+
+(c) by comparing the average measurements on the healthy individuals to the measurements on the individuals with cancer
+
+```{r BetterExperimentDesign, cache = TRUE}
+library(Biobase)
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bottomly_eset.RData")
+load(file=con)
+close(con)
+bot = bottomly.eset
+pdata_bot=pData(bot)
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bodymap_eset.RData")
+load(file=con)
+close(con)
+bm = bodymap.eset
+pdata_bm=pData(bm)
+head(pdata_bm)
+head(pdata_bot)
+summary(pdata_bm)
+summary(pdata_bot)
+is.na(pdata_bm$tissue.type)
+sum(is.na(pdata_bm$tissue.type))
+sum(is.na(pdata_bot$strain))
+dim(pdata_bm)
+dim(pdata_bot)
+```
+
+the Bottomly data set is likely a better experimental design than the Bodymap data because the number of technical replicates in the Bodymap data varies, but the number in the Bottomly data is consistent.
+
+http://stackoverflow.com/questions/1474081/how-do-i-install-an-r-package-from-source
+
+
+```{r}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bodymap_eset.RData")
+load(file=con)
+close(con)
+bm = bodymap.eset
+pdata_bm=pData(bm)
+
+library(plotrix)
+pie3D(pdata_bm$num.tech.reps,labels=pdata_bm$tissue.type)
+```
+
+row_sums = rowSums(edata)     
+index = which(rank(-row_sums) < 500 )      
+heatmap(edata[index,],Rowv=NA,Colv=NA)
+
+mm = log2(edata[,1]+1) - log2(edata[,2]+1)
+aa = log2(edata[,1]+1) + log2(edata[,2]+1)
+library(DESeq2)
+x = edata[,1:2]
+rlogEdata = rlog(x)
+mm1 = rlogEdata[,1] - rlogEdata[,2]
+aa1 = rlogEdata[,1] + rlogEdata[,2]
+plot(aa,mm,type="l",col="red", xlim = c(-2, 40), ylim= c(-15,12))
+par(new=TRUE)
+plot(aa1,mm1,type="l",col="green", xlim = c(-2, 40), ylim= c(-15,12))
+
+
+Load Montgomery and Pickrell eset: Generally, we like to cluster our data with respect to samples.
+```{r Clustering}
+con =url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/montpick_eset.RData")
+load(file=con)
+close(con)
+mp = montpick.eset
+pdata=pData(mp)
+edata=as.data.frame(exprs(mp))
+fdata = fData(mp)
+```
+
+Clustering with or without filtering is about the same. Clustering after the log2 transform shows better clustering with respect to the study variable. The likely reason is that the highly skewed distribution doesn't match the Euclidean distance metric being used in the clustering example
+
+
+### Session Info
+```{r sessionInfo, cache = TRUE}
+devtools::session_info()
+```
+
+### Last compilation
+
+Last compiled at `r Sys.Date()`.
